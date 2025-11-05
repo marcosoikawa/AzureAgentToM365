@@ -2,21 +2,23 @@
 // Licensed under the MIT License.
 
 // Use this flag to enable the Playground mode, which allows the agent to run without user authentication.
-#define PLAYGROUND
+//#define PLAYGROUND
 
-using Azure;
-using Azure.AI.Agents.Persistent;
 #if PLAYGROUND
 using Azure.Identity;
 #endif
+using Azure;
+using Azure.AI.Agents.Persistent;
 using Microsoft.Agents.Builder;
 using Microsoft.Agents.Builder.App;
 using Microsoft.Agents.Builder.State;
 using Microsoft.Agents.Core.Models;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.Agents.AzureAI;
-using Microsoft.SemanticKernel.ChatCompletion;
 using System.Collections.Concurrent;
+using Microsoft.Agents.AI;
+using System.Text.Json;
+using Microsoft.Agents.Core.Serialization;
+using System.Threading;
+using Microsoft.Extensions.AI;
 
 namespace AzureAgentToM365ATK.Agent;
 
@@ -149,39 +151,26 @@ public class AzureAgent : AgentApplication
                 // Cache the agent model for future use.
                 _agentModelCache.TryAdd(this._agentId, agentModel);
             }
-            
-            // Create an instance of the AzureAIAgent with the agent model and client.
-            AzureAIAgent _existingAgent = new AzureAIAgent(agentModel, _aiProjectClient);
 
-            AzureAIAgentThread _agentThread = null; 
+            // Create an instance of the AzureAIAgent with the agent model and client.
+            AIAgent _existingAgent = _aiProjectClient.GetAIAgent(agentModel);
+
             // Get or create thread: 
-            string agentThreadId = turnState.Conversation.GetValue<string>("conversation.threadId", () => null);
-            if (string.IsNullOrEmpty(agentThreadId))
-            {
-                // Create a new thread for the agent if it doesn't exist
-                _agentThread = new AzureAIAgentThread(_existingAgent.Client);
-            }
-            else
-            {
-                // Use the existing thread
-                _agentThread = new AzureAIAgentThread(_existingAgent.Client, agentThreadId);
-            }
+            AgentThread _agentThread = GetConversationThread(_existingAgent, turnState); 
 
             // Inform the client that we are working on a response
             await turnContext.StreamingResponse.QueueInformativeUpdateAsync("Flagging stock traders down..", cancellationToken).ConfigureAwait(false);
 
             // Create a new message to send to the Azure agent
-            ChatMessageContent message = new(AuthorRole.User, turnContext.Activity.Text);
+            ChatMessage message = new(ChatRole.User, turnContext.Activity.Text);
             // Send the message to the Azure agent and get the response
             // This will handle text responses,  if you want to handle attachments and other content types, you would need to extend this method.
-            await foreach (StreamingChatMessageContent response in _existingAgent.InvokeStreamingAsync(message, _agentThread))
+            await foreach (AgentRunResponseUpdate response in _existingAgent.RunStreamingAsync(message, _agentThread, cancellationToken: cancellationToken))
             {
-                if(!string.IsNullOrEmpty(response.Content))
-                    turnContext.StreamingResponse.QueueTextChunk(response.Content);
-                else
-                    turnContext.StreamingResponse.QueueTextChunk("No response from the Azure agent.");
+                if (!string.IsNullOrEmpty(response.Text))
+                    turnContext.StreamingResponse.QueueTextChunk(response.Text);
             }
-            turnState.Conversation.SetValue("conversation.threadId", _agentThread.Id);
+            turnState.Conversation.SetValue("conversation.threadInfo", ProtocolJsonSerializer.ToJson(_agentThread.Serialize()));
         }
         catch (Exception ex)
         {
@@ -192,5 +181,28 @@ public class AzureAgent : AgentApplication
         {
             await turnContext.StreamingResponse.EndStreamAsync(cancellationToken).ConfigureAwait(false); // End the streaming response
         }
+    }
+
+
+    /// <summary>
+    /// Manage Agent threads against the conversation state.
+    /// </summary>
+    /// <param name="agent">ChatAgent</param>
+    /// <param name="turnState">State Manager for the Agent.</param>
+    /// <returns></returns>
+    private static AgentThread GetConversationThread(AIAgent agent, ITurnState turnState)
+    {
+        AgentThread thread;
+        string? agentThreadInfo = turnState.Conversation.GetValue<string?>("conversation.threadInfo", () => null);
+        if (string.IsNullOrEmpty(agentThreadInfo))
+        {
+            thread = agent.GetNewThread();
+        }
+        else
+        {
+            JsonElement ele = ProtocolJsonSerializer.ToObject<JsonElement>(agentThreadInfo);
+            thread = agent.DeserializeThread(ele);
+        }
+        return thread;
     }
 }

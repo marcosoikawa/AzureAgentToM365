@@ -1,18 +1,22 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <NoWarn>$(NoWarn);SKEXP0110;SKEXP0010</NoWarn>
+    <UserSecretsId>1e771eaa-c5b7-444a-bba3-94a94501f448</UserSecretsId>
   </PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Azure.Identity" Version="1.14.2" />
+		<PackageReference Include="Azure.Identity" Version="1.17.0" />
 		<PackageReference Include="AdaptiveCards" Version="3.1.0" />
 		<PackageReference Include="Microsoft.Agents.Authentication.Msal" Version="1.*-*" />
 		<PackageReference Include="Microsoft.Agents.Hosting.AspNetCore" Version="1.*-*" />
-		<PackageReference Include="Microsoft.SemanticKernel.Agents.AzureAI" Version="1.*-*" />
+		<PackageReference Include="Microsoft.Agents.AI" Version="1.*-*" />
+		<PackageReference Include="Microsoft.Agents.AI.AzureAI" Version="1.*-*" />
+		<PackageReference Include="Azure.AI.Agents.Persistent" Version="1.*-*" />
+		<PackageReference Include="Microsoft.Extensions.AI" Version="9.10.2" />
 	</ItemGroup>
 
 </Project>
