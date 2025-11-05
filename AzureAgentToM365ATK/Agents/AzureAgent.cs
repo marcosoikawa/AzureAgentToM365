@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 // Use this flag to enable the Playground mode, which allows the agent to run without user authentication.
-//#define PLAYGROUND
+#define PLAYGROUND
 
 #if PLAYGROUND
 using Azure.Identity;
@@ -17,7 +17,6 @@ using System.Collections.Concurrent;
 using Microsoft.Agents.AI;
 using System.Text.Json;
 using Microsoft.Agents.Core.Serialization;
-using System.Threading;
 using Microsoft.Extensions.AI;
 
 namespace AzureAgentToM365ATK.Agent;
